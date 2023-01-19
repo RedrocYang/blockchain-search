@@ -1,0 +1,255 @@
+import com.alibaba.fastjson.JSON;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import org.bson.Document;
+
+
+
+import org.fisco.bcos.web3j.tx.txdecode.BaseException;
+import org.fisco.bcos.web3j.tx.txdecode.InputAndOutputResult;
+import org.fisco.bcos.web3j.tx.txdecode.TransactionDecoder;
+import org.fisco.bcos.web3j.tx.txdecode.TransactionDecoderFactory;
+
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.web3j.crypto.CipherException;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.WalletUtils;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.*;
+import org.web3j.protocol.core.methods.response.*;
+import org.web3j.protocol.http.HttpService;
+
+import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.tx.gas.StaticGasProvider;
+
+
+
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+
+
+public class EncExtract {
+    private static final String URL = "http://10.16.80.246:9000/";
+    private static final Logger LOG = LoggerFactory.getLogger(EncExtract.class);
+    static long  blockNum = 0;
+
+    static int total = 0;
+
+    // change contract-address
+    //private static final String contractAddress = "0x1a2f3a8151c0b3eb7d9271401396f5a3e0379dd6";
+    /**
+     * 初始化web3j普通api调用
+     *
+     * @return web3j
+     */
+    public static Web3j initWeb3j() {
+        return Web3j.build(getService());
+    }
+    /**
+     * 通过http连接到geth节点
+     * @return
+     */
+    private static HttpService getService(){
+        return new HttpService(URL);
+    }
+
+
+
+    /**
+     * @param keystorePath 用户keystore文件的路径
+     * @param password 创建用户时使用的密码
+     * @return 用户私钥
+     */
+    public static String exportPrivateKey(String keystorePath, String password) {
+        try {
+            Credentials credentials = WalletUtils.loadCredentials(password, keystorePath);
+            BigInteger privateKey = credentials.getEcKeyPair().getPrivateKey();
+            return privateKey.toString(16);
+        } catch (IOException | CipherException e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+
+    public static void main(String[] args) {
+
+        //数据上链
+        //create();
+//        opetionEthereum();
+
+            //数据处理
+            TxDataSynchronization();
+
+
+    }
+
+
+
+
+
+    /**
+     * 区块数量
+     */
+    private static BigInteger getBlockNumber() {
+        EthBlockNumber send;
+        try {
+            Web3j web3j = EncExtract.initWeb3j();
+            send = web3j.ethBlockNumber().send();
+            return send.getBlockNumber();
+        } catch (IOException e) {
+            LOG.warn("请求区块链信息异常 >> 区块数量,{}", e);
+        }
+        return null;
+    }
+
+    /***
+     *数据同步处理
+     */
+    public static void TxDataSynchronization() {
+        try {
+            Scanner scanner = new Scanner(System.in);
+            Web3j web3j = EncExtract.initWeb3j();
+            System.out.println("输入区块号");
+            blockNum = scanner.nextInt();
+            DefaultBlockParameter  currentBlock = new DefaultBlockParameterNumber(blockNum);
+            Request<?, EthBlock> request = web3j.ethGetBlockByNumber(currentBlock, true);
+            EthBlock ethBlock = null;
+            ethBlock = request.send();
+            EthBlock.Block ethBlocks = ethBlock.getBlock();
+            //get BlockNum
+            BigInteger num = ethBlocks.getNumber();
+            String  timestamp = ethBlocks.getTimestamp().toString();
+            //System.out.println("blockNum：" + num);
+            //获取区块哈希
+            String hash =  ethBlocks.getHash();
+            //System.out.println("blockHash：" + hash);
+            //处理交易中的数据
+            executeTransaction(ethBlocks.getTransactions(),blockNum,timestamp);
+
+            // TransactionReceipt receipt = web3j.ethGetTransactionReceipt(transaction.getHash()).send().getResult();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    /**
+     * 处理交易中的数据
+     * @param transactions
+     * @param blockNum
+     * @param timestamp
+     */
+    public static  void executeTransaction(List<EthBlock.TransactionResult> transactions,long blockNum,String timestamp) {
+        if (transactions.size() == 0) {
+            //no transaction in block
+
+            System.out.println("no transaction!");
+            return;
+        }
+        int sum = 0;
+        System.out.println(transactions.size());
+        try {
+            Web3j web3j = EncExtract.initWeb3j();
+            for (EthBlock.TransactionResult<EthBlock.TransactionObject> transactionResult : transactions) {
+                sum++;
+                //if (sum == 11) break;
+                EthBlock.TransactionObject transaction = transactionResult.get();
+                // TransactionReceipt |get data
+                TransactionReceipt receipt = web3j.ethGetTransactionReceipt(transaction.getHash()).send().getResult();
+                //get this block transactionHash
+                //System.out.println("transactionHash：" + receipt.getTransactionHash());
+                Request<?, EthTransaction> request = web3j.ethGetTransactionByHash(receipt.getTransactionHash());
+                EthTransaction ethTransaction = null;
+                ethTransaction = request.send();
+                //get data in transaction
+                Optional<Transaction> ethTransaction1 = ethTransaction.getTransaction();
+                String input =  ethTransaction1.get().getInput();
+                //System.out.println("input"+input);
+
+                // TxDecodeSample合约ABI
+                String abi = "[{\"constant\":false,\"inputs\":[{\"name\":\"kv1\",\"type\":\"string\"},{\"name\":\"kv2\",\"type\":\"string\"},{\"name\":\"kv3\",\"type\":\"string\"},{\"name\":\"kv4\",\"type\":\"string\"},{\"name\":\"kv5\",\"type\":\"string\"},{\"name\":\"kv6\",\"type\":\"string\"},{\"name\":\"kv7\",\"type\":\"string\"},{\"name\":\"kv8\",\"type\":\"string\"},{\"name\":\"kv9\",\"type\":\"string\"},{\"name\":\"kv0\",\"type\":\"string\"},{\"name\":\"sha_256\",\"type\":\"string\"}],\"name\":\"uploadEncEMR\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]";
+                String bin = "";
+                TransactionDecoder txDecodeSampleDecoder = TransactionDecoderFactory.buildTransactionDecoder(abi, bin);
+                String jsonResult = txDecodeSampleDecoder.decodeInputReturnJson(input);
+//                System.out.println("jsonResult"+jsonResult);
+                InputAndOutputResult objectResult = txDecodeSampleDecoder.decodeInputReturnObject(input);
+//                System.out.println("object => \n" + objectResult);
+//                System.out.println("getFunction=>" + objectResult.getFunction());
+//                System.out.println("getResult=>" + objectResult.getResult());
+
+                /**
+                 *
+                 */
+//                插入数据库
+                insertSingleDocument(objectResult,blockNum,receipt.getTransactionHash(),receipt.getTransactionIndex().toString(),timestamp);
+
+            }
+            System.out.println("extract success!");
+        } catch (IOException e) {
+            System.out.println(e.getStackTrace());
+        } /*catch (TransactionException e) {
+            e.printStackTrace();
+        } */catch (BaseException e) {
+            e.printStackTrace();
+        }
+    }
+    /***
+     * 将每笔交易处理的数据组成一个文档之后插入到数据库
+     */
+    public static void insertSingleDocument(InputAndOutputResult objectResult,long blockNum,String TxHash,String txIndex,String timestamp){
+       // System.out.println("======================================");
+        //获取集合
+        MongoCollection collection = MongoDButil.getCollection("medical","enctttests");
+        //{}对应document对象
+        Document document = new Document();//相当于写了一个｛｝
+        Document document1 = new Document();//相当于写了一个｛｝
+        int len = objectResult.getResult().size();
+//        System.out.println(objectResult.getResult());
+        String k1 = null;
+        String v1 = null;
+        for (int i = 0; i < len; i++) {
+//            String name = objectResult.getResult().get(i).getName();
+//            System.out.println("getResult=>" + name);
+            //String key = objectResult.getResult().get(i).getData().toString();
+            //System.out.print(key+"=");
+            if (i == 10){
+                k1 = objectResult.getResult().get(i).getName();
+                v1 = objectResult.getResult().get(i).getData().toString();
+            }
+            String value = objectResult.getResult().get(i).getData().toString();
+            if(!value.isEmpty() && i != 10){
+                String[] split = value.split(":");
+                k1 = split[0];
+                v1 = split[1];
+            }
+//            System.out.println(k1);
+//            System.out.println(v1);
+            document.append(k1,v1);
+
+        }
+        document1.append("blockNum",blockNum);
+        document1.append("txIndex",txIndex);
+        document1.append("txHash",TxHash);
+        document1.append("timestamp",timestamp);
+        document.append("blockInfo",document1);
+        collection.insertOne(document);
+
+    }
+
+}
+
