@@ -42,6 +42,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 
+
 public class EncExtract {
     private static final String URL = "http://10.16.80.246:9000/";
     private static final Logger LOG = LoggerFactory.getLogger(EncExtract.class);
@@ -66,6 +67,68 @@ public class EncExtract {
     private static HttpService getService(){
         return new HttpService(URL);
     }
+     /**
+     * 用于部署设计的智能合约，并调用相关函数上传密文数据
+     * @param strings
+     */
+    public static void create(String...strings){
+        Web3j web3j = initWeb3j();
+        BigInteger gasPrice = new BigInteger("10000");
+        BigInteger gasLimit = new BigInteger("60000");
+        //合约地址
+        //密文智能合约的contractaddress
+        String contractAddressenc = "0xe4b94e09904893ae2ba0ed7916aa48bf170d2bd5";
+        
+        try {
+            String minerBaseAccount = web3j.ethAccounts().send().getAccounts().get(0);
+            System.out.println(minerBaseAccount);
+            //私钥
+            Credentials credentials = Credentials.create("0x1bf1e11086634cc1da9dccedc4a242b0db763bbccc7ca48b451906b883364e51");
+            
+            //部署合约  使用一次即可(密文)
+//            RemoteCall<UploadEncEMR> deploy = UploadEncEMR.deploy(web3j, credentials, new StaticGasProvider(gasPrice,gasLimit));
+//            UploadEncEMR send = deploy.send();
+//            System.out.println(send.getContractAddress());
+            
+            //密文
+            UploadEncEMR contract = UploadEncEMR.load(contractAddressenc,web3j,credentials,new StaticGasProvider(gasPrice,gasLimit));
+
+            System.out.println(contract.getContractAddress());
+            CompletableFuture<TransactionReceipt> transactionReceiptCompletableFuture = contract.uploadEncEMR(
+                    strings[0],
+                    strings[1],
+                    strings[2],
+                    strings[3],
+                    strings[4],
+                    strings[5],
+                    strings[6],
+                    strings[7],
+                    strings[8],
+                    strings[9],
+                    strings[10]).sendAsync();
+            //=================================================================================================================================
+
+
+//
+//            transactionReceiptCompletableFuture.getTransactionIndex();
+//            TransactionReceipt transactionReceipt = transactionReceiptCompletableFuture.get();
+//            System.out.println(transactionReceipt.getTransactionHash());
+//            TransactionReceipt transactionReceipt = transactionReceiptCompletableFuture.get();
+//            List<Log> logs = transactionReceipt.getLogs();
+//            for (Log log : logs) {
+//                System.out.println(log);
+//            }
+//            TransactionReceipt transactionReceipt = transactionReceiptCompletableFuture.get();
+            //CompletableFuture<TransactionReceipt> transactionReceipt  = transfer.sendAsync();//返回交易信息
+            //System.out.println(transactionReceipt.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+    
 
     /**
      * 区块数量
