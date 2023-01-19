@@ -67,41 +67,6 @@ public class EncExtract {
         return new HttpService(URL);
     }
 
-
-
-    /**
-     * @param keystorePath 用户keystore文件的路径
-     * @param password 创建用户时使用的密码
-     * @return 用户私钥
-     */
-    public static String exportPrivateKey(String keystorePath, String password) {
-        try {
-            Credentials credentials = WalletUtils.loadCredentials(password, keystorePath);
-            BigInteger privateKey = credentials.getEcKeyPair().getPrivateKey();
-            return privateKey.toString(16);
-        } catch (IOException | CipherException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
-
-
-    public static void main(String[] args) {
-
-        //数据上链
-        //create();
-//        opetionEthereum();
-
-            //数据处理
-            TxDataSynchronization();
-
-
-    }
-
-
-
-
-
     /**
      * 区块数量
      */
@@ -250,6 +215,9 @@ public class EncExtract {
         collection.insertOne(document);
 
     }
-
+    public static void Main(String[] args) {
+            //数据处理
+            TxDataSynchronization();
+    }
 }
 
