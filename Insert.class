@@ -23,7 +23,7 @@ public class Insert {
         PROUtils proUtils = new PROUtils();//概率加密
         Realize realize = new Realize();
         Key key = aesUtils.getKey();
-        Key key1 = proUtils.getKey;
+        Key key1 = proUtils.getKey();
         String[] arr = new String[0];
         //获取集合
         //int i  =0;
@@ -33,9 +33,6 @@ public class Insert {
             //获取数据集
             BufferedReader br = new BufferedReader(new FileReader("ClinicianUtilization_2019.txt"));
             String line ;
-            int sum = 0;
-            //测试加密多少条数据
-                int i  =0;
                 while ((line=br.readLine())!=null){
                     i++;
                     if (i == 1){
