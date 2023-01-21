@@ -1,3 +1,6 @@
+/**
+对数据加密
+*/
 import encrypt.AESUtils;
 import encrypt.RSAUtils;
 import jsse.SWP;
