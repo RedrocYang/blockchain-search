@@ -1,0 +1,173 @@
+import encrypt.AESUtils;
+import encrypt.RSAUtils;
+import jsse.SWP;
+import ope.mope.MopeTest;
+import org.bouncycastle.jcajce.provider.asymmetric.RSA;
+import org.bson.Document;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.Key;
+import java.security.PrivateKey;
+import java.util.*;
+
+
+public class Realize {
+    static AESUtils aesUtils = new AESUtils();//确定性加密
+    static PROUtils proUtils = new PROUtils();//概率加密
+    static MopeTest mopeTest = new MopeTest();//保序加密
+    static SWPTest swpTest = new SWPTest();//可搜索加密
+    static Key key1 = aesUtils.getKey();
+    static Key prokey = proUtils.getKey();
+    static String[][] temp = new String[5][2];
+    static Select select = new Select();
+
+    static Set<byte[]> set = new HashSet<>();
+    static Scanner scanner = new Scanner(System.in);
+    static Sensitive sensitive = new Sensitive();
+    static List<String> isNotSensitive = new ArrayList<>();
+    //测试批量加密
+//    static int sum = 0;
+    //初始化加载可搜索加密类
+    {
+        try {
+            swpTest.setUp();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     * 明文数据进行加密
+     */
+    LinkedHashMap<String, Object> map = new LinkedHashMap<>();
+    LinkedHashMap<String, Object> encMap = new LinkedHashMap<>();
+    //@Test
+    public  void uploadData(String...strings) {
+        Realize realize = new Realize();
+        String value_1 = null;
+        String key_1 = null;
+        map.clear();
+        encMap.clear();
+        String[] keys = new String[]{"NPI", "Ind_PAC_ID", "lst_nm", "frst_nm", "spec","prac_st","hcpcs_code","hcpcs_description","line_srvc_cnt","bene_cnt"};
+        byte[] cipherText = new byte[0];
+
+        //System.out.println("");
+        String scan = "";
+        for (int i = 0; i < keys.length; i++) {
+            //System.out.println("请输入：" + keys[i]);
+            map.put(keys[i], scanner.nextLine());
+        }
+        //循环100次测试,加密一条数据
+        //int sum = 0;
+//        for (int i = 0; i < 100; i++) {
+//            long start = System.currentTimeMillis();
+            //临时
+            String stemp = "";
+            // 用于拼接所有数据
+            StringBuilder stringBuilder = new StringBuilder(stemp);
+            String sadd = "";
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+            //获取key-value
+            String key = entry.getKey();
+            String value = entry.getValue().toString();
+            //System.out.println(key + "=" + value);
+
+                //判断敏感性
+                if (sensitive.isSensitive(key)){
+                    key_1 = aesUtils.encryptData(key, key1);
+                    //我们已经事先知道了他是什么类型
+                    if (/*key.equals("address")*/key.equals("hcpcs_description")) {
+                        //使用可搜索加密
+                        //System.out.println("Searchable========================");
+                        try {
+                            //System.out.println(value);
+                            //加密上传的数据
+                            cipherText = swpTest.encSearch(value);
+                            //十六进制表示
+                            String s = toString(cipherText);
+                            //System.out.println(s);
+                            //将加密的关键词存起来
+                            set.add(cipherText);
+                            value_1 = s + ".Search";
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    } else if (/*key.equals("age")*/key.equals("line_srvc_cnt") || key.equals("bene_cnt")) {
+                        //System.out.println("OPE===================================");
+                        //System.out.println(key + "" + value + "ope");
+                        //使用OPE加密
+                        //初始化
+                        mopeTest.setUp();
+                        //加密数据，并返回加密之后的字节数
+                        byte[] cipherTexts = mopeTest.encOPE((short) Integer.parseInt(value));
+                        //System.out.println(Arrays.toString(cipherTexts));
+                        //字节转为String类型
+                        String s = toString(cipherTexts);
+                        //System.out.println("--------" + toString(cipherTexts));
+                        //System.out.println(Arrays.toString(toBytes(s)));
+                        value_1 = s + ".OPE";
+                    } else if (key.equals("NPI") || key.equals("Ind_PAC_ID")){
+                        value_1 = aesUtils.encryptData(value, key1) + ".PRO;
+                    }else{
+                        //System.out.println("AES========================================");
+                        value_1 = aesUtils.encryptData(value, key1) + ".DET";
+                    }
+                    encMap.put(key_1, value_1);
+                    stringBuilder.append(key_1+":"+value_1);
+                }else {
+                    isNotSensitive.add(key);
+                    encMap.put(key,value);
+                    stringBuilder.append(key+":"+value);
+                }
+                //获取拼接的数据字符串
+                sadd = stringBuilder.toString();
+                //System.out.println(sadd);
+                String digest = "";
+                try {
+                    digest = Sha256.getDigest(sadd);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+
+
+    }
+
+    /**
+     * 字节数组转字符串
+     * @param bytes 字节数组
+     * @return 返回字符串
+     */
+    protected static String toString(byte[] bytes) {
+        StringBuilder s = new StringBuilder();
+        for (byte b : bytes) {
+            s.append(String.format("%02x", Byte.toUnsignedInt(b)));
+        }
+        return s.toString();
+    }
+
+
+    /**
+     * 十六进制字符串转字节数组
+     * @param str 传入的16进制字符串
+     * @return 返回字节数组
+     */
+    public static byte[] toBytes(String str) {
+        if (str == null || str.trim().equals("")) {
+            return new byte[0];
+        }
+        byte[] bytes = new byte[str.length() / 2];
+        for (int i = 0; i < str.length() / 2; i++) {
+            String subStr = str.substring(i * 2, i * 2 + 2);
+            bytes[i] = (byte) Integer.parseInt(subStr, 16);
+        }
+
+        return bytes;
+    }
+
+}
